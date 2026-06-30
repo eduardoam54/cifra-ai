@@ -3,6 +3,8 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
+    model_config = {"protected_namespaces": ("settings_",), "env_file": ".env", "env_file_encoding": "utf-8"}
+
     # Backend
     app_name: str = "Cifras AI Backend"
     model_version: str = "0.1.0"
@@ -24,9 +26,6 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_key: str = ""
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
 
 
 @lru_cache
