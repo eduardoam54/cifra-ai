@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"d:\\\\cifras-ai\\\\backend\\\\app\\\\routers\")",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"d:\\\\cifras-ai\\\\backend\\\\app\\\\services\")",
+      "mcp__claude_ai_Claude_Code_Remote__list_environments"
+    ]
+  }
+}

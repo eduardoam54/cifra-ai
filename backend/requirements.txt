@@ -1,0 +1,16 @@
+# Web framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.12
+pydantic==2.10.3
+pydantic-settings==2.6.1
+
+# IA / Áudio
+demucs==4.0.1
+librosa==0.10.2.post1
+numpy==1.26.4
+soundfile==0.12.1
+audioread==3.0.1
+
+# Supabase (Fase 2 — comentar se não usar ainda)
+# supabase==2.10.0
