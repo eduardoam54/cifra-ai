@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cifras AI</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+
+  <header>
+    <span class="logo">♪</span>
+    <h1>Cifras AI</h1>
+  </header>
+
+  <section id="video-info">
+    <p id="video-title">Abra um vídeo no YouTube</p>
+    <p id="video-id" class="subtle"></p>
+  </section>
+
+  <section id="settings">
+    <label>
+      Backend URL
+      <input type="text" id="backend-url" value="http://localhost:8000" spellcheck="false">
+    </label>
+    <label>
+      Duração da gravação
+      <select id="duration">
+        <option value="30">30 segundos</option>
+        <option value="60" selected>60 segundos</option>
+        <option value="120">2 minutos</option>
+      </select>
+    </label>
+  </section>
+
+  <button id="btn-analyze" disabled>Analisar</button>
+
+  <section id="status" hidden>
+    <div id="progress-bar"><div id="progress-fill"></div></div>
+    <p id="status-text"></p>
+  </section>
+
+  <section id="error-box" hidden>
+    <p id="error-text"></p>
+  </section>
+
+  <section id="results" hidden>
+    <div id="meta">
+      <span id="bpm-badge" class="badge"></span>
+      <span id="key-badge" class="badge"></span>
+      <span id="time-badge" class="badge muted"></span>
+    </div>
+    <p class="section-label">Acordes detectados</p>
+    <div id="chord-list"></div>
+  </section>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

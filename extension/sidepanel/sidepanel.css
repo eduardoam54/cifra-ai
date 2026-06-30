@@ -1,0 +1,142 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  background: #111;
+  color: #e0e0e0;
+  padding: 14px;
+  min-width: 260px;
+}
+
+/* ── Header ── */
+header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.logo { font-size: 22px; }
+header h1 { font-size: 17px; font-weight: 700; color: #ff6b35; }
+
+/* ── Vídeo info ── */
+#video-info {
+  background: #1c1c1c;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+#video-title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.subtle { color: #666; font-size: 11px; margin-top: 2px; }
+
+/* ── Settings ── */
+#settings { margin-bottom: 12px; }
+#settings label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  color: #888;
+  font-size: 12px;
+}
+#settings input,
+#settings select {
+  background: #1c1c1c;
+  border: 1px solid #2e2e2e;
+  border-radius: 6px;
+  color: #e0e0e0;
+  padding: 6px 10px;
+  font-size: 13px;
+  outline: none;
+}
+#settings input:focus,
+#settings select:focus { border-color: #ff6b35; }
+
+/* ── Botão ── */
+#btn-analyze {
+  width: 100%;
+  padding: 10px;
+  background: #ff6b35;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 12px;
+  transition: opacity 0.15s;
+}
+#btn-analyze:disabled { opacity: 0.35; cursor: not-allowed; }
+#btn-analyze:not(:disabled):hover { opacity: 0.85; }
+
+/* ── Progresso ── */
+#status { margin-bottom: 10px; }
+#progress-bar {
+  height: 4px;
+  background: #2e2e2e;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+#progress-fill {
+  height: 100%;
+  background: #ff6b35;
+  width: 0%;
+  transition: width 0.6s linear;
+}
+#status-text { color: #888; font-size: 12px; }
+
+/* ── Erro ── */
+#error-box {
+  background: #2a1010;
+  border: 1px solid #5a1010;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  color: #f08080;
+  font-size: 12px;
+  word-break: break-word;
+}
+
+/* ── Resultados ── */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #1c1c1c;
+  font-size: 13px;
+  font-weight: 600;
+  margin-right: 6px;
+  margin-bottom: 10px;
+}
+.badge.muted { color: #666; font-weight: 400; font-size: 11px; }
+
+.section-label {
+  color: #666;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+#chord-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.chord-item {
+  background: #1c1c1c;
+  border-radius: 6px;
+  padding: 5px 10px;
+  text-align: center;
+  min-width: 48px;
+}
+.chord-item strong { display: block; font-size: 14px; font-family: monospace; }
+.chord-item .time { display: block; color: #555; font-size: 10px; margin-top: 2px; }

@@ -1,0 +1,2 @@
+cd d:\cifras-ai
+claude remote-control --name "cifras-ai"
