@@ -27,9 +27,10 @@ def separate_stems(audio_path: str, output_dir: str) -> dict[str, str]:
     settings = get_settings()
     audio = Path(audio_path)
     out = Path(output_dir)
+    bootstrap = Path(__file__).with_name("_demucs_bootstrap.py")
 
     cmd = [
-        sys.executable, "-m", "demucs",
+        sys.executable, str(bootstrap),
         "--name", settings.demucs_model,
         "--out", str(out),
         "--device", settings.demucs_device,
