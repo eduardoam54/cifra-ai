@@ -1,6 +1,6 @@
 // Fase 2: overlay sincronizado com video.currentTime.
-// Recebe a timeline de acordes do service worker (após a análise) e desenha
-// um painel flutuante sobre o vídeo, atualizado a cada frame.
+// Fase 3: transposição de acordes e controle de velocidade — tudo client-side,
+// não reprocessa nada no servidor (ver transpose.js e seção 4.2/4.3 do plano).
 
 let chordsTimeline = null;
 let bpm = null;
@@ -9,6 +9,12 @@ let videoEl = null;
 let rafId = null;
 let panelEl = null;
 let currentIndex = -1;
+let transposeSemitones = 0;
+let playbackRate = 1.0;
+
+const SPEED_MIN = 0.5;
+const SPEED_MAX = 2.0;
+const SPEED_STEP = 0.25;
 
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type === "SHOW_CHORDS") {
@@ -16,6 +22,9 @@ chrome.runtime.onMessage.addListener((msg) => {
     bpm = msg.bpm;
     key = msg.key;
     currentIndex = -1;
+    // Música nova: transposição e velocidade voltam ao padrão.
+    transposeSemitones = 0;
+    playbackRate = 1.0;
     startOverlay();
   }
 });
@@ -23,6 +32,7 @@ chrome.runtime.onMessage.addListener((msg) => {
 function startOverlay() {
   findVideoElement((video) => {
     videoEl = video;
+    applyPlaybackRate();
     ensurePanel();
     if (rafId) cancelAnimationFrame(rafId);
     tick();
@@ -48,7 +58,10 @@ function findVideoElement(callback) {
 }
 
 function ensurePanel() {
-  if (panelEl) return;
+  if (panelEl) {
+    updateControlLabels();
+    return;
+  }
 
   panelEl = document.createElement("div");
   panelEl.id = "cifras-ai-overlay";
@@ -59,8 +72,65 @@ function ensurePanel() {
     </div>
     <div class="cifras-ai-chord-current">—</div>
     <div class="cifras-ai-chord-next"></div>
+    <div class="cifras-ai-controls">
+      <div class="cifras-ai-control-group">
+        <button class="cifras-ai-btn" data-action="transpose-down" title="Transpor 1 semitom abaixo">♭</button>
+        <span class="cifras-ai-control-label" data-label="transpose"></span>
+        <button class="cifras-ai-btn" data-action="transpose-up" title="Transpor 1 semitom acima">♯</button>
+      </div>
+      <div class="cifras-ai-control-group">
+        <button class="cifras-ai-btn" data-action="speed-down" title="Diminuir velocidade">−</button>
+        <span class="cifras-ai-control-label" data-label="speed"></span>
+        <button class="cifras-ai-btn" data-action="speed-up" title="Aumentar velocidade">＋</button>
+      </div>
+    </div>
   `;
+  panelEl.querySelector(".cifras-ai-controls").addEventListener("click", onControlClick);
   document.body.appendChild(panelEl);
+  updateControlLabels();
+}
+
+function onControlClick(event) {
+  const action = event.target?.dataset?.action;
+  if (!action) return;
+
+  if (action === "transpose-down") setTranspose(transposeSemitones - 1);
+  else if (action === "transpose-up") setTranspose(transposeSemitones + 1);
+  else if (action === "speed-down") setPlaybackRate(playbackRate - SPEED_STEP);
+  else if (action === "speed-up") setPlaybackRate(playbackRate + SPEED_STEP);
+}
+
+function setTranspose(semitones) {
+  // ±11 cobre todo o círculo cromático; além disso é só repetir uma nota já alcançável.
+  transposeSemitones = Math.max(-11, Math.min(11, semitones));
+  updateControlLabels();
+  if (videoEl) updateChordDisplay(videoEl.currentTime);
+}
+
+function setPlaybackRate(rate) {
+  playbackRate = Math.max(SPEED_MIN, Math.min(SPEED_MAX, Math.round(rate * 100) / 100));
+  applyPlaybackRate();
+  updateControlLabels();
+}
+
+function applyPlaybackRate() {
+  if (!videoEl) return;
+  videoEl.playbackRate = playbackRate;
+  // Desacelerar sem mudar o tom só funciona com isso ligado; é o padrão em
+  // navegadores modernos, mas fixamos explicitamente pra não depender disso.
+  videoEl.preservesPitch = true;
+  videoEl.mozPreservesPitch = true;
+  videoEl.webkitPreservesPitch = true;
+}
+
+function updateControlLabels() {
+  if (!panelEl) return;
+  const transposeLabel = panelEl.querySelector('[data-label="transpose"]');
+  transposeLabel.textContent =
+    transposeSemitones === 0 ? "Tom original" : `${transposeSemitones > 0 ? "+" : ""}${transposeSemitones}`;
+
+  const speedLabel = panelEl.querySelector('[data-label="speed"]');
+  speedLabel.textContent = `${playbackRate.toFixed(2)}x`;
 }
 
 function tick() {
@@ -90,11 +160,18 @@ function updateChordDisplay(time) {
     }
   }
 
-  const current = chordsTimeline[currentIndex];
+  // O ponteiro pode ficar parado no último acorde conhecido mesmo depois que
+  // o tempo passa do fim dele (ex.: vídeo continua além do trecho analisado)
+  // — só exibe como "atual" se o tempo ainda está dentro do intervalo dele.
+  const pointer = chordsTimeline[currentIndex];
+  const current = pointer && time < pointer.end ? pointer : null;
   const next = chordsTimeline[currentIndex + 1];
 
-  panelEl.querySelector(".cifras-ai-key").textContent = key ? `Tom: ${key}` : "";
+  const displayKey = transposeKeyLabel(key, transposeSemitones);
+  panelEl.querySelector(".cifras-ai-key").textContent = displayKey ? `Tom: ${displayKey}` : "";
   panelEl.querySelector(".cifras-ai-bpm").textContent = bpm ? `${Math.round(bpm)} BPM` : "";
-  panelEl.querySelector(".cifras-ai-chord-current").textContent = current ? current.chord : "—";
-  panelEl.querySelector(".cifras-ai-chord-next").textContent = next ? `próximo: ${next.chord}` : "";
+  panelEl.querySelector(".cifras-ai-chord-current").textContent =
+    current ? transposeChordSymbol(current.chord, transposeSemitones) : "—";
+  panelEl.querySelector(".cifras-ai-chord-next").textContent =
+    next ? `próximo: ${transposeChordSymbol(next.chord, transposeSemitones)}` : "";
 }

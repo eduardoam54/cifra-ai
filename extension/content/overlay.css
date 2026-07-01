@@ -37,3 +37,44 @@
   font-size: 13px;
   opacity: 0.65;
 }
+
+/* Fase 3: controles de transposição/velocidade — únicos elementos clicáveis
+   do overlay; o painel em si continua com pointer-events: none. */
+#cifras-ai-overlay .cifras-ai-controls {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  pointer-events: auto;
+}
+
+#cifras-ai-overlay .cifras-ai-control-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+#cifras-ai-overlay .cifras-ai-control-label {
+  min-width: 62px;
+  text-align: center;
+  opacity: 0.85;
+}
+
+#cifras-ai-overlay .cifras-ai-btn {
+  width: 20px;
+  height: 20px;
+  line-height: 1;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#cifras-ai-overlay .cifras-ai-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

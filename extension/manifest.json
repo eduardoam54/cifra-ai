@@ -24,7 +24,7 @@
   "content_scripts": [
     {
       "matches": ["*://*.youtube.com/watch*"],
-      "js": ["content/overlay.js"],
+      "js": ["content/transpose.js", "content/overlay.js"],
       "css": ["content/overlay.css"],
       "run_at": "document_idle"
     }
