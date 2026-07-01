@@ -9,6 +9,7 @@ mesmo assim porque o Demucs separa em lote e não tem modo "skip stem".
 """
 
 import subprocess
+import sys
 import logging
 from pathlib import Path
 
@@ -28,7 +29,7 @@ def separate_stems(audio_path: str, output_dir: str) -> dict[str, str]:
     out = Path(output_dir)
 
     cmd = [
-        "python", "-m", "demucs",
+        sys.executable, "-m", "demucs",
         "--name", settings.demucs_model,
         "--out", str(out),
         "--device", settings.demucs_device,

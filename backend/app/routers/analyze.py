@@ -29,7 +29,7 @@ from app.services.separator import separate_stems
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/analyze", tags=["analyze"])
 
-_ALLOWED_EXTENSIONS = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".opus"}
+_ALLOWED_EXTENSIONS = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".opus", ".webm"}
 
 
 @router.post("", response_model=AnalysisResponse, status_code=status.HTTP_200_OK)

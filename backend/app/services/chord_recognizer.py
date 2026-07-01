@@ -68,6 +68,7 @@ def _build_templates() -> np.ndarray:
 
 
 _TEMPLATES = _build_templates()
+_TEMPLATE_NORMS = np.linalg.norm(_TEMPLATES, axis=1)
 
 _CHORD_NAMES = (
     [f"{n}" for n in _PC_TO_NOTE] +          # maiores
@@ -109,11 +110,12 @@ class ChromaChordRecognizer(BaseChordRecognizer):
 
         for i in range(n_frames):
             frame = chroma[:, i]
-            # Correlação com cada template (produto interno normalizado)
+            # Correlação com cada template (cosseno — normaliza por ambas as normas)
             scores = _TEMPLATES @ frame
             best = int(np.argmax(scores))
             chord = _CHORD_NAMES[best]
-            confidence = float(scores[best] / (np.linalg.norm(frame) + 1e-8))
+            cosine = scores[best] / (np.linalg.norm(frame) * _TEMPLATE_NORMS[best] + 1e-8)
+            confidence = float(np.clip(cosine, 0.0, 1.0))
 
             start = i * self.HOP_S
             end = (i + 1) * self.HOP_S
@@ -124,7 +126,7 @@ class ChromaChordRecognizer(BaseChordRecognizer):
                     start=events[-1].start,
                     end=end,
                     chord=chord,
-                    confidence=round((events[-1].confidence or 0 + confidence) / 2, 3),
+                    confidence=round(((events[-1].confidence or 0) + confidence) / 2, 3),
                 )
             else:
                 events.append(ChordEvent(
