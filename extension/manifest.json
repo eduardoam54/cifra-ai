@@ -9,7 +9,8 @@
     "offscreen",
     "sidePanel",
     "activeTab",
-    "tabs"
+    "tabs",
+    "storage"
   ],
 
   "background": {
@@ -19,6 +20,15 @@
   "side_panel": {
     "default_path": "sidepanel/sidepanel.html"
   },
+
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/watch*"],
+      "js": ["content/overlay.js"],
+      "css": ["content/overlay.css"],
+      "run_at": "document_idle"
+    }
+  ],
 
   "action": {
     "default_title": "Cifras AI",

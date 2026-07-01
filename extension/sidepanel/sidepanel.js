@@ -1,5 +1,6 @@
 let currentTab = null;
-let progressInterval = null;
+let hasVideo = false;
+let progressTimer = null;
 
 function extractYouTubeId(url) {
   try {
@@ -17,64 +18,91 @@ async function init() {
   currentTab = tab;
 
   const videoId = tab?.url ? extractYouTubeId(tab.url) : null;
+  hasVideo = Boolean(videoId);
 
   document.getElementById('video-title').textContent =
     videoId ? tab.title : 'Abra um vídeo no YouTube';
   document.getElementById('video-id').textContent =
     videoId ? `ID: ${videoId}` : '';
 
-  document.getElementById('btn-analyze').disabled = !videoId;
-  document.getElementById('btn-analyze').addEventListener('click', () => onAnalyze(videoId));
+  const settings = await chrome.storage.local.get({ durationSec: 60, backendUrl: 'http://localhost:8000' });
+  document.getElementById('duration').value = String(settings.durationSec);
+  document.getElementById('backend-url').value = settings.backendUrl;
+  document.getElementById('duration').addEventListener('change', saveSettings);
+  document.getElementById('backend-url').addEventListener('change', saveSettings);
+
+  document.getElementById('btn-analyze').disabled = !hasVideo;
+  document.getElementById('btn-analyze').addEventListener('click', () => onAnalyzeClick(videoId));
+
+  // Recebe atualizações de estado do service worker (captura disparada pelo
+  // clique no ícone da extensão, que é o único gatilho que concede `activeTab`).
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'STATE_UPDATE') applyState(msg.state);
+  });
+
+  chrome.runtime.sendMessage({ type: 'GET_STATE' }, (state) => {
+    if (state) applyState(state);
+  });
 }
 
-async function onAnalyze(videoId) {
-  const btn = document.getElementById('btn-analyze');
+function saveSettings() {
+  chrome.storage.local.set({
+    durationSec: parseInt(document.getElementById('duration').value, 10),
+    backendUrl: document.getElementById('backend-url').value.trim().replace(/\/$/, ''),
+  });
+}
+
+function onAnalyzeClick(videoId) {
+  // Repete a captura na aba atual reaproveitando o `activeTab` concedido
+  // quando o ícone foi clicado — só funciona se a aba não tiver navegado
+  // para outra página desde então (nesse caso, clique no ícone de novo).
+  saveSettings();
+  const durationSec = parseInt(document.getElementById('duration').value, 10);
+  const backendUrl = document.getElementById('backend-url').value.trim().replace(/\/$/, '');
+  chrome.runtime.sendMessage({
+    type: 'REANALYZE', tabId: currentTab.id, videoId, durationSec, backendUrl,
+  });
+}
+
+function applyState(state) {
   const statusEl = document.getElementById('status');
   const resultsEl = document.getElementById('results');
   const errorEl = document.getElementById('error-box');
-  const durationSec = parseInt(document.getElementById('duration').value, 10);
-  const backendUrl = document.getElementById('backend-url').value.trim().replace(/\/$/, '');
+  const btn = document.getElementById('btn-analyze');
 
-  btn.disabled = true;
-  resultsEl.hidden = true;
-  errorEl.hidden = true;
-  statusEl.hidden = false;
+  clearInterval(progressTimer);
 
-  const fill = document.getElementById('progress-fill');
-  const statusText = document.getElementById('status-text');
-  fill.style.width = '0%';
-  statusText.textContent = `Gravando ${durationSec}s de áudio...`;
+  if (state.status === 'recording') {
+    btn.disabled = true;
+    resultsEl.hidden = true;
+    errorEl.hidden = true;
+    statusEl.hidden = false;
 
-  let elapsed = 0;
-  progressInterval = setInterval(() => {
-    elapsed += 0.5;
-    const pct = Math.min(100, (elapsed / durationSec) * 100);
-    fill.style.width = `${pct}%`;
-    if (elapsed >= durationSec) {
-      statusText.textContent = 'Enviando para análise (pode levar 1-2 min)...';
-      clearInterval(progressInterval);
-    }
-  }, 500);
+    const fill = document.getElementById('progress-fill');
+    const statusText = document.getElementById('status-text');
 
-  try {
-    const result = await chrome.runtime.sendMessage({
-      type: 'START_CAPTURE',
-      tabId: currentTab.id,
-      durationSec,
-      backendUrl,
-      videoId,
-    });
-
-    clearInterval(progressInterval);
-    if (result?.error) throw new Error(result.error);
-
-    showResults(result);
-  } catch (err) {
+    const tick = () => {
+      const elapsed = (Date.now() - state.startedAt) / 1000;
+      const pct = Math.min(100, (elapsed / state.durationSec) * 100);
+      fill.style.width = `${pct}%`;
+      statusText.textContent = elapsed < state.durationSec
+        ? `Gravando ${state.durationSec}s de áudio...`
+        : 'Enviando para análise (pode levar 1-2 min)...';
+    };
+    tick();
+    progressTimer = setInterval(tick, 500);
+  } else if (state.status === 'done') {
+    btn.disabled = !hasVideo;
+    statusEl.hidden = true;
+    errorEl.hidden = true;
+    showResults(state.result);
+  } else if (state.status === 'error') {
+    btn.disabled = !hasVideo;
+    statusEl.hidden = true;
+    resultsEl.hidden = true;
     errorEl.hidden = false;
-    document.getElementById('error-text').textContent = err.message;
-  } finally {
-    clearInterval(progressInterval);
-    btn.disabled = false;
+    document.getElementById('error-text').textContent = state.error;
+  } else {
     statusEl.hidden = true;
   }
 }
