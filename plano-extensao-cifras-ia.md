@@ -148,3 +148,38 @@ analyses
 ## 8. Próximo passo sugerido
 
 Detalhar a **Fase 0**: o contrato do JSON do backend e o esqueleto do FastAPI. É a fundação de tudo o resto.
+
+---
+
+## 9. Backlog / ideias para incorporar conforme avançarmos
+
+Ideias validadas em conversa, ainda sem fase definida — encaixar quando fizer sentido no roadmap:
+
+### 9.1 Transcrição de letra + alinhamento com os acordes
+O Demucs já separa o stem de vocais (`separator.py`) — dá pra rodar um modelo de
+transcrição (Whisper / `faster-whisper`) nesse stem, pegar timestamp por palavra,
+e cruzar com a `chords_timeline` (que já tem `start`/`end`) pra montar uma cifra
+completa: letra com o acorde certo posicionado em cima da palavra certa.
+
+- **Onde entra:** novo serviço `lyrics_transcriber.py`, chamado no mesmo pipeline
+  do `/analyze`, em paralelo à detecção de BPM/tom/acordes.
+- **Trade-off:** mais um modelo pesado rodando na CPU (soma tempo ao Demucs);
+  precisão cai um pouco mesmo com vocal isolado, por causa de vazamento de
+  instrumentação no stem.
+
+### 9.2 Latência da primeira análise (músicas de ~4min não podem demorar demais)
+O cache do Supabase (Fase 2) já resolve isso pra quem não é o primeiro a pedir
+aquela música — é a alavanca principal e já está no roadmap. O que falta pensar
+é o tempo do **primeiro** processamento de cada música nova, hoje lento porque o
+Demucs roda em CPU:
+
+- **Opção A — GPU:** Demucs em GPU é ~5-10x mais rápido que em CPU (ver
+  `demucs_device` em `config.py`). Ganho grande, custo de hosting maior.
+- **Opção B — "modo rápido":** pular a separação do Demucs e reconhecer acordes
+  direto na mixagem completa via chroma (sem stems). Muito mais rápido, mas
+  perde precisão em inversões/baixo (slash chords), já que sem o stem do baixo
+  isolado o pipeline não desambigua bem esses casos (ver seção 4.1).
+
+**Prioridade sugerida:** implementar o cache (Fase 2) primeiro, por resolver a
+maioria dos casos reais de uso; revisitar GPU/modo rápido só se o tempo da
+primeira análise continuar sendo um problema depois disso.
