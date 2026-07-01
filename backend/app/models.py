@@ -25,6 +25,7 @@ class AnalysisResponse(BaseModel):
     chords_timeline: list[ChordEvent]
     model_version: str = Field(..., description="Versão do modelo ACR que gerou o resultado")
     processing_time_s: float = Field(..., description="Tempo de processamento em segundos")
+    cached: bool = Field(False, description="True se o resultado veio do cache (Supabase) em vez de reprocessar")
 
 
 class ErrorResponse(BaseModel):

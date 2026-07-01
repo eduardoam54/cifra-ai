@@ -12,5 +12,5 @@ numpy==1.26.4
 soundfile==0.12.1
 audioread==3.0.1
 
-# Supabase (Fase 2 - comentar se nao usar ainda)
-# supabase==2.10.0
+# Supabase (Fase 2) - REST direto via httpx, sem o SDK supabase-py
+httpx==0.27.2

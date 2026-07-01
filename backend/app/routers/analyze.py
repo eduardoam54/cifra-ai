@@ -22,6 +22,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from app.config import get_settings
 from app.models import AnalysisResponse
 from app.services.bpm_detector import detect_bpm
+from app.services.cache import get_cached_analysis, save_analysis
 from app.services.chord_recognizer import get_chord_recognizer
 from app.services.key_detector import detect_key
 from app.services.separator import separate_stems
@@ -41,14 +42,20 @@ async def analyze_audio(
     Recebe um arquivo de áudio e devolve a timeline de acordes, BPM e tonalidade.
 
     Pipeline:
-      1. Salva o arquivo em diretório temporário
-      2. Valida duração máxima
-      3. Separa stems com Demucs
-      4. Detecta BPM, tonalidade e acordes em paralelo (stem-level)
-      5. Devolve AnalysisResponse e limpa arquivos temporários
+      1. Consulta o cache (Supabase) por `video_id` — se houver hit, retorna direto
+      2. Salva o arquivo em diretório temporário
+      3. Valida duração máxima
+      4. Separa stems com Demucs
+      5. Detecta BPM, tonalidade e acordes em paralelo (stem-level)
+      6. Salva no cache, devolve AnalysisResponse e limpa arquivos temporários
     """
     settings = get_settings()
     request_id = str(uuid.uuid4())
+
+    cached = get_cached_analysis(video_id)
+    if cached is not None:
+        logger.info("[%s] Cache hit para video_id=%s", request_id, video_id)
+        return cached
 
     # Valida extensão
     suffix = Path(audio_file.filename or "audio").suffix.lower()
@@ -86,7 +93,7 @@ async def analyze_audio(
         logger.info("[%s] Concluído em %.2fs — %d acordes detectados",
                     request_id, processing_time, len(chords_timeline))
 
-        return AnalysisResponse(
+        result = AnalysisResponse(
             request_id=request_id,
             video_id=video_id,
             bpm=bpm,
@@ -95,6 +102,8 @@ async def analyze_audio(
             model_version=settings.model_version,
             processing_time_s=processing_time,
         )
+        save_analysis(result)
+        return result
 
     except NotImplementedError as exc:
         raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=str(exc))
