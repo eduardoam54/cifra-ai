@@ -2,8 +2,10 @@
 Reconhecimento de acordes — interface plugável.
 
 Backend selecionado via settings.chord_backend:
-  "chroma"  → ChromaChordRecognizer  (fallback, sem modelo externo, usa só librosa)
-  "btc"     → BTCChordRecognizer     (requer peso pré-treinado em settings.chord_model_path)
+  "chroma"      → ChromaChordRecognizer      (fallback, usa stems separados pelo Demucs)
+  "chroma_fast" → ChromaFastChordRecognizer  (backlog 9.2 opção B: pula o Demucs, mais
+                                               rápido, perde precisão em slash chords)
+  "btc"         → BTCChordRecognizer         (requer peso pré-treinado em chord_model_path)
 
 Para adicionar um novo backend:
   1. Crie uma classe que herde de BaseChordRecognizer.
@@ -166,7 +168,35 @@ class ChromaChordRecognizer(BaseChordRecognizer):
 
 
 # ---------------------------------------------------------------------------
-# Backend 2 — BTC (placeholder — ativa quando o peso estiver disponível)
+# Backend 2 — Chroma sem separação (backlog 9.2, opção B: "modo rápido")
+# ---------------------------------------------------------------------------
+
+class ChromaFastChordRecognizer(BaseChordRecognizer):
+    """
+    Reconhece acordes direto na mixagem completa via chroma, sem separar
+    stems com o Demucs — pula de longe a parte mais cara do pipeline.
+
+    Trade-off (ver seção 4.1/9.2 do plano): sem o stem de baixo isolado pra
+    reforçar a fundamental, perde precisão em inversões/slash chords (ex.:
+    C/A pode sair como Am), mas é muito mais rápido pra primeira análise.
+    """
+
+    HOP_S: float = 0.5
+    NEEDS_SEPARATION = False
+
+    def recognize(self, stems: dict[str, str]) -> list[ChordEvent]:
+        y, sr = librosa.load(stems["mix"], mono=True)
+        hop = int(sr * self.HOP_S)
+        chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=hop)
+
+        events = _events_from_chroma(chroma, self.HOP_S)
+        logger.info("ChromaFastRecognizer: %d eventos de acorde detectados (sem separação)",
+                    len(events))
+        return events
+
+
+# ---------------------------------------------------------------------------
+# Backend 3 — BTC (placeholder — ativa quando o peso estiver disponível)
 # ---------------------------------------------------------------------------
 
 class BTCChordRecognizer(BaseChordRecognizer):
@@ -201,6 +231,7 @@ class BTCChordRecognizer(BaseChordRecognizer):
 
 BACKENDS: dict[str, type[BaseChordRecognizer]] = {
     "chroma": ChromaChordRecognizer,
+    "chroma_fast": ChromaFastChordRecognizer,
     "btc": BTCChordRecognizer,
 }
 

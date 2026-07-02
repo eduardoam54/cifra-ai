@@ -46,7 +46,7 @@ async def analyze_audio(
       1. Consulta o cache (Supabase) por `video_id` — se houver hit, retorna direto
       2. Salva o arquivo em diretório temporário
       3. Valida duração máxima
-      4. Separa stems com Demucs
+      4. Separa stems com Demucs (pulado se chord_backend=chroma_fast — backlog 9.2)
       5. Detecta BPM, tonalidade e acordes em paralelo (stem-level)
       6. Transcreve letra se LYRICS_ENABLED=true (opt-in, nunca cacheado)
       7. Salva no cache, devolve AnalysisResponse e limpa arquivos temporários
@@ -79,20 +79,24 @@ async def analyze_audio(
 
         t_start = time.perf_counter()
 
-        # Separação de stems
-        stems_dir = os.path.join(work_dir, "stems")
-        os.makedirs(stems_dir, exist_ok=True)
-        stems = separate_stems(audio_path, stems_dir)
+        recognizer = get_chord_recognizer()
+        if recognizer.NEEDS_SEPARATION:
+            stems_dir = os.path.join(work_dir, "stems")
+            os.makedirs(stems_dir, exist_ok=True)
+            stems = separate_stems(audio_path, stems_dir)
+        else:
+            # Modo rápido (backlog 9.2): pula o Demucs, reconhece direto na mixagem.
+            stems = {"mix": audio_path}
 
         # Detecção paralela: BPM usa o áudio original; chroma usa stems
         bpm = detect_bpm(audio_path)
         key = detect_key(audio_path)
 
-        recognizer = get_chord_recognizer()
         chords_timeline = recognizer.recognize(stems)
 
         # Opt-in (LYRICS_ENABLED) e nunca persistido no cache — ver 7.1/9.1 do plano.
-        lyrics = transcribe_lyrics(stems["vocals"])
+        # Sem separação (modo rápido), não há stem de vocais isolado — usa a mixagem.
+        lyrics = transcribe_lyrics(stems.get("vocals", audio_path))
 
         processing_time = round(time.perf_counter() - t_start, 2)
         logger.info("[%s] Concluído em %.2fs — %d acordes detectados",
