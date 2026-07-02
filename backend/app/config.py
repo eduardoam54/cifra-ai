@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_key: str = ""
 
+    # Letras (backlog 9.1) — opt-in: risco de copyright maior que acordes/BPM/tom
+    # (ver plano seção 7.1/9.1). Nunca persistido no cache, mesmo se habilitado.
+    lyrics_enabled: bool = False
+    lyrics_model_size: str = "base"  # tiny/base/small/medium/large-v3 (faster-whisper)
+
 
 
 @lru_cache

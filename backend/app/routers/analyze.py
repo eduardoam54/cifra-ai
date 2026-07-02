@@ -25,6 +25,7 @@ from app.services.bpm_detector import detect_bpm
 from app.services.cache import get_cached_analysis, save_analysis
 from app.services.chord_recognizer import get_chord_recognizer
 from app.services.key_detector import detect_key
+from app.services.lyrics_transcriber import transcribe_lyrics
 from app.services.separator import separate_stems
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,8 @@ async def analyze_audio(
       3. Valida duração máxima
       4. Separa stems com Demucs
       5. Detecta BPM, tonalidade e acordes em paralelo (stem-level)
-      6. Salva no cache, devolve AnalysisResponse e limpa arquivos temporários
+      6. Transcreve letra se LYRICS_ENABLED=true (opt-in, nunca cacheado)
+      7. Salva no cache, devolve AnalysisResponse e limpa arquivos temporários
     """
     settings = get_settings()
     request_id = str(uuid.uuid4())
@@ -89,6 +91,9 @@ async def analyze_audio(
         recognizer = get_chord_recognizer()
         chords_timeline = recognizer.recognize(stems)
 
+        # Opt-in (LYRICS_ENABLED) e nunca persistido no cache — ver 7.1/9.1 do plano.
+        lyrics = transcribe_lyrics(stems["vocals"])
+
         processing_time = round(time.perf_counter() - t_start, 2)
         logger.info("[%s] Concluído em %.2fs — %d acordes detectados",
                     request_id, processing_time, len(chords_timeline))
@@ -101,6 +106,7 @@ async def analyze_audio(
             chords_timeline=chords_timeline,
             model_version=settings.model_version,
             processing_time_s=processing_time,
+            lyrics=lyrics,
         )
         save_analysis(result)
         return result

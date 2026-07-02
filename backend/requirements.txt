@@ -14,3 +14,6 @@ audioread==3.0.1
 
 # Supabase (Fase 2) - REST direto via httpx, sem o SDK supabase-py
 httpx==0.27.2
+
+# Letras (backlog 9.1) - opt-in via LYRICS_ENABLED, ver .env.example
+faster-whisper==1.0.3
