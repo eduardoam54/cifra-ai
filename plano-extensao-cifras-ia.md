@@ -139,9 +139,40 @@ analyses
 ## 7. Riscos a monitorar
 
 - **DRM** — limita o público a fontes abertas (item 2.1).
-- **ToS das plataformas** — capturar/processar áudio de terceiros é zona cinzenta; revisar antes de publicar na Chrome Web Store.
+- **ToS das plataformas** — capturar/processar áudio de terceiros é zona cinzenta; revisar antes de publicar na Chrome Web Store. Ver análise em 7.1.
 - **Custo do backend** — Demucs é caro em CPU/GPU. O cache resolve a maior parte; vídeos novos têm custo de primeira análise.
 - **Propagação de erro** — se a separação falha num trecho, o acorde sai errado ali. O baixo ajuda a desambiguar, mas não é perfeito.
+
+### 7.1 Análise preliminar de ToS / risco legal
+
+Pesquisa feita nos Termos de Serviço do YouTube e nas políticas do Chrome Web Store (ver fontes no fim desta seção). **Isto não é aconselhamento jurídico** — é o suficiente pra decidir com informação antes de publicar, não pra validar publicação.
+
+**YouTube ToS — o texto é bem restritivo:**
+> "acessar, reproduzir, fazer download, distribuir, transmitir, exibir, vender, licenciar, alterar, modificar ou usar de outra forma qualquer parte do Serviço ou qualquer Conteúdo, exceto: (a) se autorizado de forma expressa pelo Serviço; ou (b) mediante uma permissão prévia por escrito do YouTube"
+
+Isso cobre literalmente "usar de outra forma" — capturar o áudio de uma aba via `chrome.tabCapture` e mandar pra um backend externo pra análise é, ao pé da letra, um uso não previsto pelo player oficial. Na prática, a aplicação real do YouTube historicamente mira **downloaders em massa e scrapers automatizados** (a cláusula de "meios automatizados" cita explicitamente robôs/botnets/scrapers), não extensões que capturam áudio sob ação manual do próprio usuário, um vídeo por vez, sem redistribuir o conteúdo. Mas o risco formal existe e não desaparece só por sermos um caso de uso pequeno.
+
+**Mitigação já embutida na arquitetura atual (bom sinal):**
+- O áudio bruto **nunca é persistido** — `analyze.py` processa em diretório temporário e roda `shutil.rmtree` no `finally`, mesmo em erro. Só a *timeline de acordes derivada* (fatos: acorde, BPM, tom) fica no cache — não o áudio, não a música em si.
+- Acordes/BPM/tom isolados são, em geral, tratados como fatos/ideias não protegíveis por copyright (equivalente a alguém transcrever de ouvido) — bem diferente de redistribuir a gravação ou a letra.
+
+**Chrome Web Store — políticas do programa de desenvolvedor:**
+- Exige permissões mínimas necessárias (`tabCapture`, `offscreen`, `sidePanel` já batem com isso — nada de permissão "por via das dúvidas").
+- Exige transparência total sobre coleta/uso de dados — como o áudio sai do dispositivo do usuário rumo a um backend de terceiros, **vai precisar de política de privacidade explícita** antes de publicar, deixando claro: o que é capturado, pra onde vai, que não fica salvo, e o que é cacheado (resultado da análise, por vídeo, não o áudio).
+- A política do Chrome Web Store rege a conduta da extensão em si — **não neutraliza** o risco separado do ToS do YouTube; são duas camadas de risco independentes.
+
+**Risco adicional identificado — maior que o dos acordes:** o item 9.1 do backlog (transcrição de letra via Whisper) é uma categoria de risco diferente e mais alta. Letra de música **é conteúdo protegido por copyright** (não é fato/ideia como um acorde) — sites de letras historicamente tiveram disputas e precisam de licenciamento (ex.: LyricFind) pra exibir letras legalmente. Reproduzir letra transcrita, mesmo que gerada localmente via IA, ainda é reproduzir a obra protegida. Recomendo tratar isso como recurso separado, sinalizado com risco mais alto, se/quando for implementado (ver nota em 9.1).
+
+**Recomendação prática:**
+1. Enquanto o projeto for uso pessoal/pequena escala (não publicado na Chrome Web Store), o risco é baixo — é o equivalente digital de anotar os acordes de ouvido enquanto assiste ao vídeo.
+2. Antes de publicar na Web Store: escrever política de privacidade explícita (obrigatória pela política de dados do usuário) e reavaliar se cachear a timeline de acordes por `video_id` de forma pública/compartilhada entre usuários muda o perfil de risco (hoje o schema do Supabase já é por vídeo, não por usuário — vale decidir se o cache é privado por instalação ou compartilhado globalmente).
+3. Não implementar 9.1 (letras) sem decisão explícita e ciente do risco de copyright mais alto que os acordes/BPM/tom.
+
+**Fontes consultadas:**
+- [YouTube Terms of Service](https://www.youtube.com/static?template=terms)
+- [YouTube Terms of Service Explained — TLDRLegal](https://www.tldrlegal.com/license/youtube-terms-of-service)
+- [Chrome Web Store — Program Policies](https://developer.chrome.com/docs/webstore/program-policies)
+- [Chrome Web Store — Updated Privacy Policy & Secure Handling Requirements](https://developer.chrome.com/docs/webstore/program-policies/user-data-faq)
 
 ---
 
@@ -166,6 +197,10 @@ completa: letra com o acorde certo posicionado em cima da palavra certa.
 - **Trade-off:** mais um modelo pesado rodando na CPU (soma tempo ao Demucs);
   precisão cai um pouco mesmo com vocal isolado, por causa de vazamento de
   instrumentação no stem.
+- **Risco legal mais alto que o resto do projeto** (ver 7.1): letra é conteúdo
+  protegido por copyright, diferente de acordes/BPM/tom (tratados como fato).
+  Se cachear no Supabase, cachear só pra uso próprio/privado, não expor a letra
+  transcrita publicamente sem entender essa diferença de risco.
 
 ### 9.2 Latência da primeira análise (músicas de ~4min não podem demorar demais)
 O cache do Supabase (Fase 2) já resolve isso pra quem não é o primeiro a pedir
