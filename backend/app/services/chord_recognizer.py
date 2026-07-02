@@ -31,6 +31,10 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 class BaseChordRecognizer(ABC):
+    #: Se False, o router pula a separação Demucs e passa {"mix": audio_path}
+    #: em vez dos stems reais (ver ChromaFastChordRecognizer / backlog 9.2).
+    NEEDS_SEPARATION: bool = True
+
     @abstractmethod
     def recognize(self, stems: dict[str, str]) -> list[ChordEvent]:
         """
@@ -50,30 +54,80 @@ class BaseChordRecognizer(ABC):
 _PC_TO_NOTE = ["C", "C#", "D", "D#", "E", "F",
                "F#", "G", "G#", "A", "A#", "B"]
 
-# Templates de acorde: tríades maiores e menores para cada tônica
-# shape (24, 12) — 12 maiores + 12 menores
-def _build_templates() -> np.ndarray:
+# Qualidades reconhecidas: sufixo do símbolo → intervalos em semitons a partir
+# da fundamental. Fase 4 (plano, seção 4.1): antes só tríades maior/menor —
+# isso ainda não é um modelo ACR de verdade (exigiria peso pré-treinado tipo
+# BTC/Chordformer, ver BTCChordRecognizer), mas amplia o vocabulário além da
+# tríade mais próxima para as qualidades mais comuns em cifras.
+_QUALITIES: dict[str, tuple[int, ...]] = {
+    "": (0, 4, 7),          # maior
+    "m": (0, 3, 7),         # menor
+    "7": (0, 4, 7, 10),     # dominante
+    "maj7": (0, 4, 7, 11),  # maior com sétima maior
+    "m7": (0, 3, 7, 10),    # menor com sétima menor
+    "m7b5": (0, 3, 6, 10),  # meio-diminuto
+    "dim": (0, 3, 6),       # diminuto
+    "aug": (0, 4, 8),       # aumentado
+    "sus2": (0, 2, 7),
+    "sus4": (0, 5, 7),
+}
+
+
+def _build_templates() -> tuple[np.ndarray, list[str]]:
+    """Gera os templates de chroma (um por acorde) e os nomes correspondentes.
+
+    shape: (12 tônicas × len(_QUALITIES), 12 pitch classes)
+    """
     templates = []
-    for root in range(12):
-        # maior: root, terça maior (+4), quinta (+7)
-        major = np.zeros(12)
-        major[[root, (root + 4) % 12, (root + 7) % 12]] = 1.0
-        templates.append(major)
-    for root in range(12):
-        # menor: root, terça menor (+3), quinta (+7)
-        minor = np.zeros(12)
-        minor[[root, (root + 3) % 12, (root + 7) % 12]] = 1.0
-        templates.append(minor)
-    return np.array(templates)  # (24, 12)
+    names = []
+    for suffix, intervals in _QUALITIES.items():
+        for root in range(12):
+            template = np.zeros(12)
+            template[[(root + i) % 12 for i in intervals]] = 1.0
+            templates.append(template)
+            names.append(f"{_PC_TO_NOTE[root]}{suffix}")
+    return np.array(templates), names
 
 
-_TEMPLATES = _build_templates()
+_TEMPLATES, _CHORD_NAMES = _build_templates()
 _TEMPLATE_NORMS = np.linalg.norm(_TEMPLATES, axis=1)
 
-_CHORD_NAMES = (
-    [f"{n}" for n in _PC_TO_NOTE] +          # maiores
-    [f"{n}m" for n in _PC_TO_NOTE]           # menores
-)
+
+def _events_from_chroma(chroma: np.ndarray, hop_s: float) -> list[ChordEvent]:
+    """Template matching frame a frame + agrupamento de frames consecutivos
+    com o mesmo acorde. Compartilhado entre os backends baseados em chroma
+    (com e sem separação de stems — ver ChromaFastChordRecognizer)."""
+    n_frames = chroma.shape[1]
+    events: list[ChordEvent] = []
+
+    for i in range(n_frames):
+        frame = chroma[:, i]
+        # Correlação com cada template (cosseno — normaliza por ambas as normas)
+        scores = _TEMPLATES @ frame
+        best = int(np.argmax(scores))
+        chord = _CHORD_NAMES[best]
+        cosine = scores[best] / (np.linalg.norm(frame) * _TEMPLATE_NORMS[best] + 1e-8)
+        confidence = float(np.clip(cosine, 0.0, 1.0))
+
+        start = i * hop_s
+        end = (i + 1) * hop_s
+
+        if events and events[-1].chord == chord:
+            events[-1] = ChordEvent(
+                start=events[-1].start,
+                end=end,
+                chord=chord,
+                confidence=round(((events[-1].confidence or 0) + confidence) / 2, 3),
+            )
+        else:
+            events.append(ChordEvent(
+                start=round(start, 3),
+                end=round(end, 3),
+                chord=chord,
+                confidence=round(confidence, 3),
+            ))
+
+    return events
 
 
 class ChromaChordRecognizer(BaseChordRecognizer):
@@ -84,11 +138,12 @@ class ChromaChordRecognizer(BaseChordRecognizer):
     para melhorar a identificação — mesma lógica do pipeline completo,
     só sem modelo de ML.
 
-    Precisão: boa para tríades comuns; acordes extendidos/alterados
-    serão simplificados para a tríade mais próxima.
+    Precisão: boa para tríades e as qualidades em _QUALITIES; combinações
+    fora desse vocabulário (tensões, acordes alterados) caem na mais próxima.
     """
 
     HOP_S: float = 0.5   # janela de análise em segundos
+    NEEDS_SEPARATION = True
 
     def recognize(self, stems: dict[str, str]) -> list[ChordEvent]:
         # Funde baixo + harmonia (voz + outros)
@@ -105,37 +160,7 @@ class ChromaChordRecognizer(BaseChordRecognizer):
         chroma_harm = librosa.feature.chroma_cqt(y=y_harm, sr=sr, hop_length=hop)
         chroma = 0.6 * chroma_bass + 0.4 * chroma_harm  # fusão ponderada
 
-        n_frames = chroma.shape[1]
-        events: list[ChordEvent] = []
-
-        for i in range(n_frames):
-            frame = chroma[:, i]
-            # Correlação com cada template (cosseno — normaliza por ambas as normas)
-            scores = _TEMPLATES @ frame
-            best = int(np.argmax(scores))
-            chord = _CHORD_NAMES[best]
-            cosine = scores[best] / (np.linalg.norm(frame) * _TEMPLATE_NORMS[best] + 1e-8)
-            confidence = float(np.clip(cosine, 0.0, 1.0))
-
-            start = i * self.HOP_S
-            end = (i + 1) * self.HOP_S
-
-            # Agrupa frames consecutivos com o mesmo acorde
-            if events and events[-1].chord == chord:
-                events[-1] = ChordEvent(
-                    start=events[-1].start,
-                    end=end,
-                    chord=chord,
-                    confidence=round(((events[-1].confidence or 0) + confidence) / 2, 3),
-                )
-            else:
-                events.append(ChordEvent(
-                    start=round(start, 3),
-                    end=round(end, 3),
-                    chord=chord,
-                    confidence=round(confidence, 3),
-                ))
-
+        events = _events_from_chroma(chroma, self.HOP_S)
         logger.info("ChromaRecognizer: %d eventos de acorde detectados", len(events))
         return events
 
