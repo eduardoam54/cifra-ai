@@ -2,17 +2,23 @@
    (pointer-events: none) — os controles do YouTube continuam acessíveis. */
 
 #cifras-ai-overlay {
+  --accent: #ff6b35;
+  --accent-light: #ff9760;
+
   position: fixed;
   bottom: 90px;
   right: 24px;
   z-index: 2147483647;
-  min-width: 170px;
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: rgba(15, 15, 15, 0.85);
+  min-width: 190px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: linear-gradient(165deg, rgba(26, 22, 20, 0.88), rgba(10, 10, 12, 0.92));
+  border: 1px solid rgba(255, 107, 53, 0.22);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   color: #fff;
   font-family: "YouTube Sans", Roboto, Arial, sans-serif;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.2);
   pointer-events: none;
   user-select: none;
 }
@@ -21,21 +27,25 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-size: 12px;
-  opacity: 0.75;
-  margin-bottom: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-light);
+  margin-bottom: 6px;
 }
 
 #cifras-ai-overlay .cifras-ai-chord-current {
-  font-size: 32px;
-  font-weight: 700;
-  line-height: 1.1;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
 }
 
 #cifras-ai-overlay .cifras-ai-chord-next {
-  margin-top: 2px;
-  font-size: 13px;
-  opacity: 0.65;
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.55);
 }
 
 /* Fase 3: controles de transposição/velocidade — únicos elementos clicáveis
@@ -44,9 +54,9 @@
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   pointer-events: auto;
 }
 
@@ -58,23 +68,29 @@
 }
 
 #cifras-ai-overlay .cifras-ai-control-label {
-  min-width: 62px;
+  min-width: 60px;
   text-align: center;
   opacity: 0.85;
+  font-variant-numeric: tabular-nums;
 }
 
 #cifras-ai-overlay .cifras-ai-btn {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   line-height: 1;
   border: none;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
   font-size: 13px;
   cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
 }
 
 #cifras-ai-overlay .cifras-ai-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--accent);
+}
+
+#cifras-ai-overlay .cifras-ai-btn:active {
+  transform: scale(0.9);
 }
